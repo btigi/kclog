@@ -1,14 +1,12 @@
 ﻿using Indieteur.GlobalHooks;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Data.SQLite;
-using System.IO;
 using System.Threading.Tasks;
 using System.Timers;
 
-// See https://github.com/Indieteur/GlobalHooks?tab=readme-ov-file for information on how the hook works
 namespace kclog
 {
     class Program
@@ -18,6 +16,7 @@ namespace kclog
         private readonly static ConcurrentQueue<string> keyQueue = new();
         private static Timer logTimer;
         private static string DbPath;
+        private static string ConnectionString;
 
         static void Main()
         {
@@ -37,6 +36,14 @@ namespace kclog
                    .AddJsonFile("appsettings.json", false, true);
             var app = builder.Build();
             DbPath = app["DbPath"];
+            var dbPassword = app["DbPassword"];
+
+            ConnectionString = new SqliteConnectionStringBuilder()
+            {
+                DataSource = DbPath,
+                Mode = SqliteOpenMode.ReadWriteCreate,
+                Password = dbPassword
+            }.ToString();
 
             await InitializeDatabase();
 
@@ -75,7 +82,7 @@ namespace kclog
         private static void GlobalKeyHook_OnKeyUp(object sender, GlobalKeyEventArgs e)
         {
             var key = e.CharResult;
-            key = GetKeyDescription(e.KeyCode, key);            
+            key = GetKeyDescription(e.KeyCode, key);
             keyQueue.Enqueue(key);
         }
 
@@ -106,7 +113,7 @@ namespace kclog
             key = virtualKeycode == VirtualKeycodes.F2 ? "F2" : key;
             key = virtualKeycode == VirtualKeycodes.F3 ? "F3" : key;
             key = virtualKeycode == VirtualKeycodes.F4 ? "F4" : key;
-            key = virtualKeycode == VirtualKeycodes.F5 ? "F5" : key; 
+            key = virtualKeycode == VirtualKeycodes.F5 ? "F5" : key;
             key = virtualKeycode == VirtualKeycodes.F6 ? "F6" : key;
             key = virtualKeycode == VirtualKeycodes.F7 ? "F7" : key;
             key = virtualKeycode == VirtualKeycodes.F8 ? "F8" : key;
@@ -125,12 +132,7 @@ namespace kclog
 
         private static async Task InitializeDatabase()
         {
-            if (!File.Exists(DbPath))
-            {
-                SQLiteConnection.CreateFile(DbPath);
-            }
-
-            using var connection = new SQLiteConnection($"Data Source={DbPath};Version=3;");
+            using var connection = new SqliteConnection(ConnectionString);
             await connection.OpenAsync();
 
             var keysTableQuery = @"
@@ -139,7 +141,7 @@ namespace kclog
                             Key TEXT NOT NULL,
                             Timestamp DATETIME NOT NULL
                         )";
-            using var keysCommand = new SQLiteCommand(keysTableQuery, connection);
+            using var keysCommand = new SqliteCommand(keysTableQuery, connection);
             await keysCommand.ExecuteNonQueryAsync();
 
             await connection.CloseAsync();
@@ -147,10 +149,10 @@ namespace kclog
 
         private static async Task LogKeyPressToDatabase(IList<string> keys)
         {
-            using var connection = new SQLiteConnection($"Data Source={DbPath};Version=3;");
+            using var connection = new SqliteConnection(ConnectionString);
             await connection.OpenAsync();
             var insertQuery = "INSERT INTO Keys (Key, Timestamp) VALUES (@key, @timestamp)";
-            using var insertCmd = new SQLiteCommand(insertQuery, connection);
+            using var insertCmd = new SqliteCommand(insertQuery, connection);
             var now = DateTime.Now;
             var timestamp = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0);
             foreach (var key in keys)
@@ -158,6 +160,7 @@ namespace kclog
                 insertCmd.Parameters.AddWithValue("@key", key);
                 insertCmd.Parameters.AddWithValue("@timestamp", timestamp);
                 await insertCmd.ExecuteNonQueryAsync();
+                insertCmd.Parameters.Clear();
             }
             await connection.CloseAsync();
         }

@@ -33,6 +33,8 @@ Configuration values are stored in appsettings.json
 
   `DbPath` - The full path to the database file, e.g. C:\keys.db
 
+  `DbPassword` - The password for encryption of the database
+
   `PulseTime` - The number of milliseconds between save events, e.g 30000
   
 ## Additional
@@ -43,3 +45,4 @@ This repository includes a copy of the GlobalHooks [repository](https://github.c
 
 - kclog is licenced under CC BY-NC-ND 4.0 https://creativecommons.org/licenses/by-nc/4.0/ Full licence details are available in licence.md
 - kclog relies on code by [Indieteur](https://github.com/Indieteur/GlobalHooks) under the [CC0 1.0 Universal licence](https://creativecommons.org/publicdomain/zero/1.0/)
+- kclog uses [SQLitePCL.raw](https://github.com/ericsink/SQLitePCL.raw) under the Apache 2.0 licence, for SQLite database encryption.
